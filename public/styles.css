@@ -102,6 +102,10 @@ p {
   display: contents;
 }
 
+.manual-controls[hidden] {
+  display: none !important;
+}
+
 select,
 button {
   height: 38px;

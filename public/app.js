@@ -93,7 +93,7 @@ function restoreSavedState() {
     select.value = pickSavedOrDefault(savedManualChannels[index], index + 2);
   });
 
-  isManualRandomMode = localStorage.getItem('manualRandomMode') === 'true';
+  isManualRandomMode = false;
   manualRandomMode.checked = isManualRandomMode;
 }
 
@@ -150,7 +150,6 @@ function setManualRandomMode(enabled, options = {}) {
   manualRandomMode.checked = enabled;
   manualRandomControls.hidden = !enabled;
   refreshRandomButton.disabled = enabled;
-  localStorage.setItem('manualRandomMode', String(enabled));
 
   if (enabled) {
     window.clearTimeout(refreshTimer);
@@ -357,4 +356,3 @@ function shuffle(items) {
   }
   return copy;
 }
-
