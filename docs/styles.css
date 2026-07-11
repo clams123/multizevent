@@ -46,6 +46,15 @@ p {
   font-size: 14px;
 }
 
+.disclaimer {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.disclaimer a {
+  color: var(--text);
+}
+
 .status,
 .controls label {
   display: flex;
@@ -74,6 +83,25 @@ p {
   font-size: 13px;
 }
 
+.manual-toggle {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  cursor: pointer;
+}
+
+.manual-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.manual-controls {
+  display: contents;
+}
+
 select,
 button {
   height: 38px;
@@ -98,6 +126,11 @@ button {
 
 button:hover {
   background: #7d32f0;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .grid {

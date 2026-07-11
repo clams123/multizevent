@@ -2,29 +2,43 @@ const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const slots = [...document.querySelectorAll('.player')];
 const channelOneSelect = document.querySelector('#channelOne');
 const channelTwoSelect = document.querySelector('#channelTwo');
-const applyChosenButton = document.querySelector('#applyChosen');
+const manualRandomMode = document.querySelector('#manualRandomMode');
+const manualRandomControls = document.querySelector('#manualRandomControls');
+const manualRandomSelects = [...document.querySelectorAll('[data-manual-slot]')];
 const refreshRandomButton = document.querySelector('#refreshRandom');
 const randomStatus = document.querySelector('#randomStatus');
 const template = document.querySelector('#playerTemplate');
 
 let channelList = [];
 let currentRandomChannels = [];
+let isManualRandomMode = false;
 let refreshTimer = null;
 let countdownTimer = null;
 let nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
 
-applyChosenButton.addEventListener('click', () => {
-  keepChosenChannelsDistinct();
-  saveChosenChannels();
-  renderChosenPlayers();
-  reconcileRandomPlayersWithChosenChannels();
+channelOneSelect.addEventListener('change', () => handleChosenChannelChange(0));
+channelTwoSelect.addEventListener('change', () => handleChosenChannelChange(1));
+
+manualRandomMode.addEventListener('change', () => {
+  setManualRandomMode(manualRandomMode.checked);
 });
 
-channelOneSelect.addEventListener('change', keepChosenChannelsDistinct);
-channelTwoSelect.addEventListener('change', keepChosenChannelsDistinct);
+manualRandomSelects.forEach((select) => {
+  select.addEventListener('change', () => {
+    const slotIndex = Number(select.dataset.manualSlot);
+    saveManualRandomChannels();
+    renderPlayer(slotIndex, {
+      channel: normalizeChannel(select.value),
+      displayName: normalizeChannel(select.value),
+      status: 'manual'
+    });
+  });
+});
 
 refreshRandomButton.addEventListener('click', () => {
-  loadRandomPlayers(true);
+  if (!isManualRandomMode) {
+    loadRandomPlayers(true);
+  }
 });
 
 await boot();
@@ -38,22 +52,25 @@ async function boot() {
 
     channelList = (await response.json()).map(normalizeChannel).filter(Boolean);
     populateChannelSelects();
-    renderChosenPlayers();
-    loadRandomPlayers(true);
+    restoreSavedState();
+    renderChosenPlayer(0);
+    renderChosenPlayer(1);
+
+    if (isManualRandomMode) {
+      setManualRandomMode(true, { initial: true });
+    } else {
+      loadRandomPlayers(true);
+    }
   } catch (error) {
     randomStatus.textContent = `Impossible de charger la liste: ${error.message}`;
     [0, 1, 2, 3, 4].forEach((slotIndex) => {
-      renderEmptySlot(slotIndex, `Lecteur ${slotIndex + 1}`, 'Verifie data/channels.json.');
+      renderEmptySlot(slotIndex, `Lecteur ${slotIndex + 1}`, 'Verifie channels.json.');
     });
   }
 }
 
 function populateChannelSelects() {
-  const savedChannels = JSON.parse(localStorage.getItem('chosenChannels') || '[]');
-  const firstDefault = savedChannels[0] || channelList[0] || '';
-  const secondDefault = savedChannels[1] || channelList.find((channel) => channel !== firstDefault) || '';
-
-  [channelOneSelect, channelTwoSelect].forEach((select) => {
+  [channelOneSelect, channelTwoSelect, ...manualRandomSelects].forEach((select) => {
     select.replaceChildren(
       ...channelList.map((channel) => {
         const option = document.createElement('option');
@@ -63,20 +80,38 @@ function populateChannelSelects() {
       })
     );
   });
-
-  channelOneSelect.value = channelList.includes(firstDefault) ? firstDefault : channelList[0] || '';
-  channelTwoSelect.value = channelList.includes(secondDefault) ? secondDefault : channelList[1] || channelList[0] || '';
-  keepChosenChannelsDistinct();
 }
 
-function keepChosenChannelsDistinct() {
-  if (channelList.length < 2 || channelOneSelect.value !== channelTwoSelect.value) {
-    return;
+function restoreSavedState() {
+  const savedChosenChannels = JSON.parse(localStorage.getItem('chosenChannels') || '[]');
+  const savedManualChannels = JSON.parse(localStorage.getItem('manualRandomChannels') || '[]');
+
+  channelOneSelect.value = pickSavedOrDefault(savedChosenChannels[0], 0);
+  channelTwoSelect.value = pickSavedOrDefault(savedChosenChannels[1], 1);
+
+  manualRandomSelects.forEach((select, index) => {
+    select.value = pickSavedOrDefault(savedManualChannels[index], index + 2);
+  });
+
+  isManualRandomMode = localStorage.getItem('manualRandomMode') === 'true';
+  manualRandomMode.checked = isManualRandomMode;
+}
+
+function pickSavedOrDefault(savedChannel, fallbackIndex) {
+  const normalized = normalizeChannel(savedChannel);
+  if (channelList.includes(normalized)) {
+    return normalized;
   }
 
-  const replacement = channelList.find((channel) => channel !== channelOneSelect.value);
-  if (replacement) {
-    channelTwoSelect.value = replacement;
+  return channelList[fallbackIndex] || channelList[0] || '';
+}
+
+function handleChosenChannelChange(slotIndex) {
+  saveChosenChannels();
+  renderChosenPlayer(slotIndex);
+
+  if (!isManualRandomMode) {
+    reconcileRandomPlayersWithChosenChannels();
   }
 }
 
@@ -87,37 +122,70 @@ function saveChosenChannels() {
   );
 }
 
-function renderChosenPlayers() {
-  const channels = [normalizeChannel(channelOneSelect.value), normalizeChannel(channelTwoSelect.value)];
-  channels.forEach((channel, index) => {
-    if (!channel) {
-      renderEmptySlot(index, `Lecteur ${index + 1}`, 'Choisis un streamer puis clique sur Afficher.');
-      return;
-    }
+function saveManualRandomChannels() {
+  localStorage.setItem(
+    'manualRandomChannels',
+    JSON.stringify(manualRandomSelects.map((select) => normalizeChannel(select.value)))
+  );
+}
 
-    renderPlayer(index, {
-      channel,
-      displayName: channel,
-      status: 'chosen'
+function renderChosenPlayer(slotIndex) {
+  const select = slotIndex === 0 ? channelOneSelect : channelTwoSelect;
+  const channel = normalizeChannel(select.value);
+
+  if (!channel) {
+    renderEmptySlot(slotIndex, `Lecteur ${slotIndex + 1}`, 'Choisis un streamer.');
+    return;
+  }
+
+  renderPlayer(slotIndex, {
+    channel,
+    displayName: channel,
+    status: 'chosen'
+  });
+}
+
+function setManualRandomMode(enabled, options = {}) {
+  isManualRandomMode = enabled;
+  manualRandomMode.checked = enabled;
+  manualRandomControls.hidden = !enabled;
+  refreshRandomButton.disabled = enabled;
+  localStorage.setItem('manualRandomMode', String(enabled));
+
+  if (enabled) {
+    window.clearTimeout(refreshTimer);
+    window.clearInterval(countdownTimer);
+    randomStatus.textContent = 'Mode manuel actif';
+    saveManualRandomChannels();
+    renderManualRandomPlayers();
+    return;
+  }
+
+  if (!options.initial) {
+    loadRandomPlayers(true);
+  }
+}
+
+function renderManualRandomPlayers() {
+  manualRandomSelects.forEach((select) => {
+    const slotIndex = Number(select.dataset.manualSlot);
+    renderPlayer(slotIndex, {
+      channel: normalizeChannel(select.value),
+      displayName: normalizeChannel(select.value),
+      status: 'manual'
     });
   });
 }
 
 function loadRandomPlayers(force = false) {
   saveChosenChannels();
-  const excludedChannels = [normalizeChannel(channelOneSelect.value), normalizeChannel(channelTwoSelect.value)];
-  const availableChannels = channelList.filter((channel) => !excludedChannels.includes(channel));
+  const chosenSet = getChosenChannelSet();
+  const availableChannels = channelList.filter((channel) => !chosenSet.has(channel));
 
   randomStatus.textContent = 'Tirage en cours...';
 
   try {
-    const randomStreams = shuffle(availableChannels).slice(0, 3).map((channel) => ({
-      channel,
-      displayName: channel,
-      status: 'random'
-    }));
-    currentRandomChannels = randomStreams.map((stream) => stream.channel);
-
+    currentRandomChannels = shuffle(availableChannels).slice(0, 3);
     renderRandomPlayers();
 
     nextRefreshAt = force ? Date.now() + REFRESH_INTERVAL_MS : nextTenMinuteBoundary();
@@ -130,28 +198,42 @@ function loadRandomPlayers(force = false) {
 }
 
 function reconcileRandomPlayersWithChosenChannels() {
-  const chosenChannels = [normalizeChannel(channelOneSelect.value), normalizeChannel(channelTwoSelect.value)];
-  const chosenSet = new Set(chosenChannels);
-  const currentWithoutConflicts = currentRandomChannels.filter((channel) => !chosenSet.has(channel));
+  const chosenSet = getChosenChannelSet();
 
-  if (currentWithoutConflicts.length === currentRandomChannels.length && currentRandomChannels.length === 3) {
-    return;
-  }
+  currentRandomChannels.forEach((channel, randomIndex) => {
+    if (!chosenSet.has(channel)) {
+      return;
+    }
 
-  const replacementPool = channelList.filter(
-    (channel) => !chosenSet.has(channel) && !currentWithoutConflicts.includes(channel)
-  );
-  const replacements = shuffle(replacementPool).slice(0, 3 - currentWithoutConflicts.length);
+    const replacement = findReplacementRandomChannel(chosenSet);
+    currentRandomChannels[randomIndex] = replacement;
 
-  currentRandomChannels = [...currentWithoutConflicts, ...replacements].slice(0, 3);
-  renderRandomPlayers();
+    if (replacement) {
+      renderPlayer(randomIndex + 2, {
+        channel: replacement,
+        displayName: replacement,
+        status: 'random'
+      });
+    } else {
+      renderEmptySlot(randomIndex + 2, `Aleatoire ${randomIndex + 1}`, 'Ajoute plus de chaines dans channels.json.');
+    }
+  });
+}
+
+function findReplacementRandomChannel(chosenSet) {
+  const currentSet = new Set(currentRandomChannels);
+  return shuffle(channelList).find((channel) => !chosenSet.has(channel) && !currentSet.has(channel));
+}
+
+function getChosenChannelSet() {
+  return new Set([normalizeChannel(channelOneSelect.value), normalizeChannel(channelTwoSelect.value)].filter(Boolean));
 }
 
 function renderRandomPlayers() {
   [2, 3, 4].forEach((slotIndex, randomIndex) => {
     const channel = currentRandomChannels[randomIndex];
     if (!channel) {
-      renderEmptySlot(slotIndex, `Aleatoire ${randomIndex + 1}`, 'Ajoute plus de chaines dans data/channels.json.');
+      renderEmptySlot(slotIndex, `Aleatoire ${randomIndex + 1}`, 'Ajoute plus de chaines dans channels.json.');
       return;
     }
 
@@ -175,19 +257,20 @@ function renderPlayer(slotIndex, stream) {
   const shouldShowChat = slotIndex < 2;
 
   slot.classList.toggle('has-chat', shouldShowChat);
-  label.textContent = slotIndex < 2 ? `Lecteur ${slotIndex + 1}` : `Aleatoire ${slotIndex - 1}`;
+  label.textContent = slotIndex < 2 ? `Lecteur ${slotIndex + 1}` : `Lecteur ${slotIndex + 1}`;
   link.textContent = stream.displayName || channel;
   link.href = `https://twitch.tv/${channel}`;
   videoFrame.title = `Lecteur Twitch ${channel}`;
   videoFrame.src = twitchPlayerUrl(channel);
+
   if (shouldShowChat) {
     chatFrame.title = `Chat Twitch ${channel}`;
     chatFrame.src = twitchChatUrl(channel);
   } else {
     chatFrame.remove();
   }
-  meta.textContent = buildMetaText(stream);
 
+  meta.textContent = buildMetaText(stream);
   slot.replaceChildren(content);
 }
 
@@ -196,6 +279,7 @@ function renderEmptySlot(slotIndex, labelText, message) {
   const empty = document.createElement('div');
   empty.className = 'empty-slot';
   empty.innerHTML = `<strong>${labelText}</strong><span>${message}</span>`;
+  slot.classList.remove('has-chat');
   slot.replaceChildren(empty);
 }
 
@@ -221,6 +305,10 @@ function twitchChatUrl(channel) {
 function buildMetaText(stream) {
   if (stream.status === 'random') {
     return 'Tire depuis la liste locale';
+  }
+
+  if (stream.status === 'manual') {
+    return 'Choisi manuellement';
   }
 
   return 'Choisi manuellement';
@@ -269,3 +357,4 @@ function shuffle(items) {
   }
   return copy;
 }
+

@@ -11,6 +11,10 @@
       <div>
         <h1>Petit Multiview Twitch</h1>
         <p>Deux streams choisis dans la liste, trois streams tires de cette meme liste toutes les 10 minutes.</p>
+        <p class="disclaimer">
+          Site non officiel, le seul et unique vrai site est
+          <a href="https://zevent.fr/" target="_blank" rel="noreferrer">https://zevent.fr/</a>
+        </p>
       </div>
       <div class="status">
         <span id="randomStatus">Chargement...</span>
@@ -27,7 +31,24 @@
         Lecteur 2
         <select id="channelTwo"></select>
       </label>
-      <button id="applyChosen" type="button">Afficher</button>
+      <label class="manual-toggle">
+        <input id="manualRandomMode" type="checkbox" />
+        Choisir manuellement les lecteurs 3, 4 et 5
+      </label>
+      <div id="manualRandomControls" class="manual-controls" hidden>
+        <label>
+          Lecteur 3
+          <select data-manual-slot="2"></select>
+        </label>
+        <label>
+          Lecteur 4
+          <select data-manual-slot="3"></select>
+        </label>
+        <label>
+          Lecteur 5
+          <select data-manual-slot="4"></select>
+        </label>
+      </div>
     </section>
 
     <main class="grid" aria-label="Lecteurs Twitch">
