@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Petit Multiview Twitch</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Petit Multiview Twitch</h1>
+        <p>Deux streams choisis dans la liste, trois streams tires de cette meme liste toutes les 10 minutes.</p>
+      </div>
+      <div class="status">
+        <span id="randomStatus">Chargement...</span>
+        <button id="refreshRandom" type="button">Relancer le tirage</button>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Streams choisis">
+      <label>
+        Lecteur 1
+        <select id="channelOne"></select>
+      </label>
+      <label>
+        Lecteur 2
+        <select id="channelTwo"></select>
+      </label>
+      <button id="applyChosen" type="button">Afficher</button>
+    </section>
+
+    <main class="grid" aria-label="Lecteurs Twitch">
+      <section class="player slot-wide" data-slot="0"></section>
+      <section class="player slot-wide" data-slot="1"></section>
+      <section class="player" data-slot="2"></section>
+      <section class="player" data-slot="3"></section>
+      <section class="player" data-slot="4"></section>
+    </main>
+
+    <template id="playerTemplate">
+      <div class="player-header">
+        <span class="slot-label"></span>
+        <a class="channel-link" target="_blank" rel="noreferrer"></a>
+      </div>
+      <div class="player-body">
+        <iframe
+          class="video-frame"
+          allowfullscreen="true"
+          scrolling="no"
+          allow="autoplay; fullscreen"
+        ></iframe>
+        <iframe class="chat-frame" title=""></iframe>
+      </div>
+      <p class="player-meta"></p>
+    </template>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
