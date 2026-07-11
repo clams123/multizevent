@@ -8,6 +8,7 @@ const randomStatus = document.querySelector('#randomStatus');
 const template = document.querySelector('#playerTemplate');
 
 let channelList = [];
+let currentRandomChannels = [];
 let refreshTimer = null;
 let countdownTimer = null;
 let nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
@@ -16,7 +17,7 @@ applyChosenButton.addEventListener('click', () => {
   keepChosenChannelsDistinct();
   saveChosenChannels();
   renderChosenPlayers();
-  loadRandomPlayers(true);
+  reconcileRandomPlayersWithChosenChannels();
 });
 
 channelOneSelect.addEventListener('change', keepChosenChannelsDistinct);
@@ -115,16 +116,9 @@ function loadRandomPlayers(force = false) {
       displayName: channel,
       status: 'random'
     }));
+    currentRandomChannels = randomStreams.map((stream) => stream.channel);
 
-    [2, 3, 4].forEach((slotIndex, randomIndex) => {
-      const stream = randomStreams[randomIndex];
-      if (!stream) {
-        renderEmptySlot(slotIndex, `Aleatoire ${randomIndex + 1}`, 'Ajoute plus de chaines dans data/channels.json.');
-        return;
-      }
-
-      renderPlayer(slotIndex, stream);
-    });
+    renderRandomPlayers();
 
     nextRefreshAt = force ? Date.now() + REFRESH_INTERVAL_MS : nextTenMinuteBoundary();
     scheduleNextRefresh();
@@ -133,6 +127,40 @@ function loadRandomPlayers(force = false) {
     randomStatus.textContent = `Erreur tirage: ${error.message}`;
     scheduleNextRefresh();
   }
+}
+
+function reconcileRandomPlayersWithChosenChannels() {
+  const chosenChannels = [normalizeChannel(channelOneSelect.value), normalizeChannel(channelTwoSelect.value)];
+  const chosenSet = new Set(chosenChannels);
+  const currentWithoutConflicts = currentRandomChannels.filter((channel) => !chosenSet.has(channel));
+
+  if (currentWithoutConflicts.length === currentRandomChannels.length && currentRandomChannels.length === 3) {
+    return;
+  }
+
+  const replacementPool = channelList.filter(
+    (channel) => !chosenSet.has(channel) && !currentWithoutConflicts.includes(channel)
+  );
+  const replacements = shuffle(replacementPool).slice(0, 3 - currentWithoutConflicts.length);
+
+  currentRandomChannels = [...currentWithoutConflicts, ...replacements].slice(0, 3);
+  renderRandomPlayers();
+}
+
+function renderRandomPlayers() {
+  [2, 3, 4].forEach((slotIndex, randomIndex) => {
+    const channel = currentRandomChannels[randomIndex];
+    if (!channel) {
+      renderEmptySlot(slotIndex, `Aleatoire ${randomIndex + 1}`, 'Ajoute plus de chaines dans data/channels.json.');
+      return;
+    }
+
+    renderPlayer(slotIndex, {
+      channel,
+      displayName: channel,
+      status: 'random'
+    });
+  });
 }
 
 function renderPlayer(slotIndex, stream) {
